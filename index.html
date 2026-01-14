@@ -228,7 +228,6 @@
 
         <div class="error-box hidden" id="errorBox"><h3>⚠️ Σφάλμα φόρτωσης</h3><p id="errorMsg"></p></div>
 
-        <!-- Main Cards -->
         <div class="cards">
             <div class="card d" id="cardD">
                 <div class="card-header"><h2>D</h2><div class="streak"><span class="fire">🔥</span><span class="count" id="d-streak">0</span><span>ημέρες</span></div></div>
@@ -283,7 +282,6 @@
             </div>
         </div>
 
-        <!-- Milestones -->
         <div class="section-box">
             <h3>🎯 Milestones</h3>
             <div class="tabs">
@@ -294,7 +292,6 @@
             <div class="milestones hidden" id="milestones-m"></div>
         </div>
 
-        <!-- Chart -->
         <div class="section-box">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin: 0;">📈 Trend & Moving Average</h3>
@@ -307,7 +304,6 @@
             <canvas id="weightChart"></canvas>
         </div>
 
-        <!-- Weekly Summary -->
         <div class="section-box">
             <h3>📊 Weekly Summary</h3>
             <div class="tabs">
@@ -318,7 +314,6 @@
             <div id="weekly-m" class="hidden"><table class="data-table"><thead><tr><th>Εβδομάδα</th><th>Αρχή</th><th>Τέλος</th><th>Αλλαγή</th></tr></thead><tbody id="weekly-table-m"></tbody></table></div>
         </div>
 
-        <!-- Monthly Summary -->
         <div class="section-box">
             <h3>📅 Monthly Summary</h3>
             <div class="tabs">
@@ -329,7 +324,6 @@
             <div id="monthly-m" class="hidden"><table class="data-table"><thead><tr><th>Μήνας</th><th>Αρχή</th><th>Τέλος</th><th>Αλλαγή</th><th>Μετρήσεις</th></tr></thead><tbody id="monthly-table-m"></tbody></table></div>
         </div>
 
-        <!-- Measurements History -->
         <div class="section-box">
             <h3>📋 Ιστορικό Μετρήσεων</h3>
             <div class="tabs">
@@ -340,7 +334,6 @@
             <div id="history-m" class="hidden"><table class="data-table"><thead><tr><th>Ημ/νία</th><th>Βάρος</th><th>Αλλαγή</th><th>Από αρχή</th></tr></thead><tbody id="history-table-m"></tbody></table></div>
         </div>
 
-        <!-- Heatmap -->
         <div class="section-box">
             <h3>📅 Consistency Heatmap</h3>
             <div style="display: flex; gap: 15px;">
@@ -358,7 +351,6 @@
             </div>
         </div>
 
-        <!-- Comparison -->
         <div class="section-box" id="comparisonBox">
             <h3>⚖️ Σύγκριση D vs M</h3>
             <div id="comparison" style="display: flex; flex-direction: column; gap: 15px;"></div>
@@ -412,27 +404,12 @@
             document.getElementById('lastUpdate').textContent = 'Φόρτωση...';
             let errors = [];
 
-            if (SETTINGS_URL) {
-                try {
-                    const resp = await fetch(SETTINGS_URL);
-                    if (resp.ok) {
-                        const csv = await resp.text();
-                        csv.split('\n').slice(1).forEach(row => {
-                            const [person, start, target] = row.split(',').map(c => c.trim());
-                            if (person === 'D' || person === 'M') CONFIG[person] = { start: parseFloat(start), target: parseFloat(target) };
-                        });
-                    }
-                } catch(e) { console.warn('Settings not loaded'); }
-            }
-
             for (const p of ['D', 'M']) {
                 try {
                     const resp = await fetch(URLS[p]);
                     if (!resp.ok) throw new Error('HTTP ' + resp.status);
                     const csv = await resp.text();
-                    console.log(`[DEBUG] ${p} CSV first 500 chars:`, csv.substring(0, 500));
                     allData[p] = parseCSV(csv, CONFIG[p]);
-                    console.log(`[DEBUG] ${p} parsed data:`, allData[p]);
                     updateCard(p.toLowerCase(), allData[p], CONFIG[p]);
                     updateMilestones(p.toLowerCase(), allData[p], CONFIG[p]);
                     updateHistory(p.toLowerCase(), allData[p], CONFIG[p]);
@@ -464,7 +441,25 @@
             const weights = [], labels = [], dailyCompliance = [];
             let startKg = cfg.start;
 
-            data.forEach(row => {
+            // Βρες την τελευταία γραμμή με δεδομένα (lastActiveRow)
+            let lastActiveRow = -1;
+            for (let i = data.length - 1; i >= 0; i--) {
+                const row = data[i];
+                const hasWeight = parseFloat(row[cols.weight]) > 0;
+                const hasDiet = row[cols.diet] === 'TRUE';
+                const hasGym = row[cols.gym] === 'TRUE';
+                const hasSteps = row[cols.steps] === 'TRUE';
+                const hasAlcohol = row[cols.alcohol] === 'TRUE';
+                if (hasWeight || hasDiet || hasGym || hasSteps || hasAlcohol) {
+                    lastActiveRow = i;
+                    break;
+                }
+            }
+
+            // Το totalDays είναι μέχρι την τελευταία ενεργή γραμμή (συμπεριλαμβανομένων κενών στη μέση)
+            const totalDays = lastActiveRow + 1;
+
+            data.forEach((row, idx) => {
                 const w = parseFloat(row[cols.weight]);
                 if (w > 0) {
                     if (weights.length === 0) startKg = w;
@@ -479,15 +474,16 @@
                 dailyCompliance.push(score);
             });
 
-            // X/total (από την αρχή) αντί για X/7
+            // X/total: μετράει TRUE μέχρι totalDays
             const calcTotalCompliance = (colIndex) => {
-                const filled = data.filter(r => r[colIndex] === 'TRUE' || r[colIndex] === 'FALSE');
-                const success = filled.filter(r => r[colIndex] === 'TRUE').length;
-                return { count: success, total: filled.length };
+                const relevantData = data.slice(0, totalDays);
+                const success = relevantData.filter(r => r[colIndex] === 'TRUE').length;
+                return { count: success, total: totalDays };
             };
 
             const calcCompliance = (col) => {
-                const filled = data.filter(r => r[col] === 'TRUE' || r[col] === 'FALSE');
+                const relevantData = data.slice(0, totalDays);
+                const filled = relevantData.filter(r => r[col] === 'TRUE' || r[col] === 'FALSE');
                 const yes = filled.filter(r => r[col] === 'TRUE').length;
                 return filled.length > 0 ? Math.round(yes / filled.length * 100) : 0;
             };
@@ -519,7 +515,7 @@
             const weekAvg = last7.length > 0 ? last7.reduce((a,b) => a+b, 0) / last7.length : null;
 
             return {
-                weights, labels, ma, dailyCompliance, startKg,
+                weights, labels, ma, dailyCompliance, startKg, totalDays,
                 current: weights.length > 0 ? weights[weights.length - 1] : null,
                 weekAvg, streak, maxStreak, bestWeek,
                 totalCompliance: {
@@ -770,7 +766,7 @@
                 container.innerHTML = '';
                 const data = p === 'd' ? allData.D : allData.M;
                 if (!data) return;
-                const compliance = data.dailyCompliance;
+                const compliance = data.dailyCompliance.slice(0, data.totalDays);
                 const weeks = Math.ceil(compliance.length / 7);
                 for (let w = 0; w < weeks; w++) {
                     const weekDiv = document.createElement('div');
