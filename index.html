@@ -433,7 +433,27 @@
         }
 
         function parseCSV(csv, cfg) {
-            const rows = csv.split('\n').map(r => r.split(',').map(c => c.trim()));
+            // Proper CSV parsing that handles quoted fields with commas
+            function parseCSVLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                result.push(current.trim());
+                return result;
+            }
+            
+            const rows = csv.split('\n').map(r => parseCSVLine(r));
             const data = rows.slice(1).filter(r => r[0] && r[0].length > 0);
 
             const cols = { date: 0, day: 1, weight: 2, diet: 3, gym: 4, steps: 5, alcohol: 6 };
@@ -442,13 +462,16 @@
             let startKg = cfg.start;
 
             // Βρες την τελευταία γραμμή με δεδομένα (lastActiveRow)
+            // Μια γραμμή έχει δεδομένα αν: έχει βάρος Ή έχει TRUE σε κάποιο checkbox
             let lastActiveRow = -1;
             for (let i = data.length - 1; i >= 0; i--) {
                 const row = data[i];
-                const hasWeight = parseFloat(row[cols.weight]) > 0;
+                const weightStr = row[cols.weight]?.replace(',', '.') || '';
+                const hasWeight = parseFloat(weightStr) > 0;
                 const hasDiet = row[cols.diet] === 'TRUE';
                 const hasGym = row[cols.gym] === 'TRUE';
                 const hasSteps = row[cols.steps] === 'TRUE';
+                // ALCOHOL TRUE σημαίνει ήπιε - αυτό επίσης είναι "δεδομένο"
                 const hasAlcohol = row[cols.alcohol] === 'TRUE';
                 if (hasWeight || hasDiet || hasGym || hasSteps || hasAlcohol) {
                     lastActiveRow = i;
@@ -460,7 +483,9 @@
             const totalDays = lastActiveRow + 1;
 
             data.forEach((row, idx) => {
-                const w = parseFloat(row[cols.weight]);
+                // Handle Greek decimal format (comma instead of dot)
+                const weightStr = row[cols.weight]?.replace(',', '.') || '';
+                const w = parseFloat(weightStr);
                 if (w > 0) {
                     if (weights.length === 0) startKg = w;
                     labels.push(row[0]);
@@ -470,21 +495,23 @@
                 if (row[cols.diet] === 'TRUE') score++;
                 if (row[cols.gym] === 'TRUE') score++;
                 if (row[cols.steps] === 'TRUE') score++;
-                if (row[cols.alcohol] === 'TRUE') score++;
+                if (row[cols.alcohol] === 'FALSE') score++;  // inverted: FALSE = no alcohol = good
                 dailyCompliance.push(score);
             });
 
-            // X/total: μετράει TRUE μέχρι totalDays
-            const calcTotalCompliance = (colIndex) => {
+            // X/total: μετράει TRUE μέχρι totalDays (εκτός ALCOHOL που μετράει FALSE)
+            const calcTotalCompliance = (colIndex, invertLogic = false) => {
                 const relevantData = data.slice(0, totalDays);
-                const success = relevantData.filter(r => r[colIndex] === 'TRUE').length;
+                const targetValue = invertLogic ? 'FALSE' : 'TRUE';
+                const success = relevantData.filter(r => r[colIndex] === targetValue).length;
                 return { count: success, total: totalDays };
             };
 
-            const calcCompliance = (col) => {
+            const calcCompliance = (col, invertLogic = false) => {
                 const relevantData = data.slice(0, totalDays);
                 const filled = relevantData.filter(r => r[col] === 'TRUE' || r[col] === 'FALSE');
-                const yes = filled.filter(r => r[col] === 'TRUE').length;
+                const targetValue = invertLogic ? 'FALSE' : 'TRUE';
+                const yes = filled.filter(r => r[col] === targetValue).length;
                 return filled.length > 0 ? Math.round(yes / filled.length * 100) : 0;
             };
 
@@ -522,13 +549,13 @@
                     diet: calcTotalCompliance(cols.diet),
                     gym: calcTotalCompliance(cols.gym),
                     steps: calcTotalCompliance(cols.steps),
-                    alcohol: calcTotalCompliance(cols.alcohol)
+                    alcohol: calcTotalCompliance(cols.alcohol, true)  // inverted: FALSE = success (no alcohol)
                 },
                 compliance: {
                     diet: calcCompliance(cols.diet),
                     gym: calcCompliance(cols.gym),
                     steps: calcCompliance(cols.steps),
-                    alcohol: calcCompliance(cols.alcohol)
+                    alcohol: calcCompliance(cols.alcohol, true)  // inverted: FALSE = success (no alcohol)
                 }
             };
         }
