@@ -1,35 +1,857 @@
-# Diet Tracker Pro 🏋️
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏋️ Diet Tracker Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 10px; font-size: 1.8em; }
+        .subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 0.9em; }
+        .hidden { display: none; }
+        .error-box {
+            background: rgba(239,68,68,0.2);
+            border: 1px solid #ef4444;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .error-box h3 { color: #ef4444; margin-bottom: 10px; }
+        .last-update { text-align: center; color: #666; font-size: 0.8em; margin-bottom: 20px; }
+        .cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .card h2 { font-size: 1.4em; }
+        .card.d h2 { color: #4facfe; }
+        .card.m h2 { color: #f093fb; }
+        .streak {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            background: rgba(251,146,60,0.2);
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        .streak .fire { font-size: 1.1em; }
+        .streak .count { font-weight: bold; color: #fb923c; }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .stat:last-child { border-bottom: none; }
+        .stat-label { color: #aaa; }
+        .stat-value { font-weight: bold; font-size: 1.1em; }
+        .stat-value.positive { color: #4ade80; }
+        .stat-value.negative { color: #f87171; }
+        .stat-value.weekly { color: #fbbf24; font-size: 0.9em; }
+        .progress-container { margin: 20px 0; }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        .progress-bar {
+            height: 28px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+            transition: width 0.5s;
+            min-width: 40px;
+        }
+        .progress-fill.d { background: linear-gradient(90deg, #4facfe, #00f2fe); }
+        .progress-fill.m { background: linear-gradient(90deg, #f093fb, #f5576c); }
+        .eta-box {
+            text-align: center;
+            margin-top: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+        }
+        .eta-box .label { color: #888; font-size: 0.85em; }
+        .eta-box .value { font-size: 1.3em; font-weight: bold; margin-top: 5px; }
+        .compliance {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .compliance-item {
+            text-align: center;
+            padding: 10px 6px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+        .compliance-item .label { font-size: 0.7em; color: #888; margin-bottom: 5px; }
+        .compliance-item .value { font-size: 1.2em; font-weight: bold; }
+        .compliance-item .value.green { color: #4ade80; }
+        .compliance-item .value.yellow { color: #fbbf24; }
+        .compliance-item .value.red { color: #f87171; }
+        .personal-bests {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .pb-item {
+            padding: 10px;
+            background: rgba(74,222,128,0.1);
+            border-radius: 10px;
+            text-align: center;
+        }
+        .pb-item .label { font-size: 0.7em; color: #888; margin-bottom: 3px; }
+        .pb-item .value { font-size: 1.1em; font-weight: bold; color: #4ade80; }
+        .pb-item .date { font-size: 0.65em; color: #666; margin-top: 2px; }
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.75em;
+            background: rgba(255,255,255,0.08);
+        }
+        .badge.gold { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .badge.silver { background: rgba(156,163,175,0.2); color: #9ca3af; }
+        .badge.bronze { background: rgba(217,119,6,0.2); color: #d97706; }
+        .badge.special { background: rgba(168,85,247,0.2); color: #a855f7; }
+        .section-box {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section-box h3 { color: #ccc; margin-bottom: 15px; }
+        .milestones {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .milestone {
+            padding: 15px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            text-align: center;
+        }
+        .milestone.achieved {
+            background: rgba(74,222,128,0.15);
+            border: 1px solid rgba(74,222,128,0.3);
+        }
+        .milestone .icon { font-size: 2em; margin-bottom: 8px; }
+        .milestone .title { font-size: 0.9em; color: #aaa; margin-bottom: 5px; }
+        .milestone .status { font-weight: bold; font-size: 1.1em; }
+        .milestone.achieved .status { color: #4ade80; }
+        .milestone:not(.achieved) .status { color: #666; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        .data-table th, .data-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .data-table th {
+            color: #888;
+            font-weight: normal;
+            font-size: 0.8em;
+            text-transform: uppercase;
+        }
+        .data-table td { color: #ddd; }
+        .data-table .positive { color: #4ade80; }
+        .data-table .negative { color: #f87171; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+        .tab {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            border-radius: 8px;
+            color: #888;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .tab.active { background: rgba(79,172,254,0.2); color: #4facfe; }
+        .tab:hover { background: rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏋️ Diet Tracker Pro</h1>
+        <p class="subtitle">D & M — Ιανουάριος 2026</p>
+        <p class="last-update" id="lastUpdate">Τελευταία ενημέρωση: —</p>
 
-Dashboard για tracking βάρους και compliance (D & M).
+        <div class="error-box hidden" id="errorBox"><h3>⚠️ Σφάλμα φόρτωσης</h3><p id="errorMsg"></p></div>
 
-## Setup
+        <div class="cards">
+            <div class="card d" id="cardD">
+                <div class="card-header"><h2>D</h2><div class="streak"><span class="fire">🔥</span><span class="count" id="d-streak">0</span><span>ημέρες</span></div></div>
+                <div class="stat"><span class="stat-label">Αρχικό</span><span class="stat-value" id="d-start">—</span></div>
+                <div class="stat"><span class="stat-label">Τρέχον</span><span class="stat-value" id="d-current">—</span></div>
+                <div class="stat"><span class="stat-label">Εβδομ. μ.ο.</span><span class="stat-value weekly" id="d-weekavg">—</span></div>
+                <div class="stat"><span class="stat-label">Απώλεια</span><span class="stat-value positive" id="d-lost">—</span></div>
+                <div class="stat"><span class="stat-label">Υπολείπεται</span><span class="stat-value" id="d-remaining">—</span></div>
+                <div class="stat"><span class="stat-label">Ρυθμός/εβδ</span><span class="stat-value" id="d-rate">—</span></div>
+                <div class="progress-container">
+                    <div class="progress-label"><span>Πρόοδος</span><span id="d-pct">0%</span></div>
+                    <div class="progress-bar"><div class="progress-fill d" id="d-bar" style="width:5%"></div></div>
+                </div>
+                <div class="eta-box"><div class="label">ETA στόχου</div><div class="value" id="d-eta">—</div></div>
+                <div class="compliance">
+                    <div class="compliance-item"><div class="label">ΔΙΑΙΤΑ</div><div class="value" id="d-diet">—</div></div>
+                    <div class="compliance-item"><div class="label">ΑΣΚΗΣΗ</div><div class="value" id="d-gym">—</div></div>
+                    <div class="compliance-item"><div class="label">8K+</div><div class="value" id="d-steps">—</div></div>
+                    <div class="compliance-item"><div class="label">NO ALC</div><div class="value" id="d-alcohol">—</div></div>
+                </div>
+                <div class="personal-bests">
+                    <div class="pb-item"><div class="label">🏆 Καλύτερη εβδ.</div><div class="value" id="d-bestweek">—</div><div class="date" id="d-bestweek-date"></div></div>
+                    <div class="pb-item"><div class="label">📅 Max streak</div><div class="value" id="d-maxstreak">—</div></div>
+                </div>
+                <div class="badges" id="d-badges"></div>
+            </div>
 
-Το dashboard τραβάει δεδομένα από Google Sheets CSV.
+            <div class="card m" id="cardM">
+                <div class="card-header"><h2>M</h2><div class="streak"><span class="fire">🔥</span><span class="count" id="m-streak">0</span><span>ημέρες</span></div></div>
+                <div class="stat"><span class="stat-label">Αρχικό</span><span class="stat-value" id="m-start">—</span></div>
+                <div class="stat"><span class="stat-label">Τρέχον</span><span class="stat-value" id="m-current">—</span></div>
+                <div class="stat"><span class="stat-label">Εβδομ. μ.ο.</span><span class="stat-value weekly" id="m-weekavg">—</span></div>
+                <div class="stat"><span class="stat-label">Απώλεια</span><span class="stat-value positive" id="m-lost">—</span></div>
+                <div class="stat"><span class="stat-label">Υπολείπεται</span><span class="stat-value" id="m-remaining">—</span></div>
+                <div class="stat"><span class="stat-label">Ρυθμός/εβδ</span><span class="stat-value" id="m-rate">—</span></div>
+                <div class="progress-container">
+                    <div class="progress-label"><span>Πρόοδος</span><span id="m-pct">0%</span></div>
+                    <div class="progress-bar"><div class="progress-fill m" id="m-bar" style="width:5%"></div></div>
+                </div>
+                <div class="eta-box"><div class="label">ETA στόχου</div><div class="value" id="m-eta">—</div></div>
+                <div class="compliance">
+                    <div class="compliance-item"><div class="label">ΔΙΑΙΤΑ</div><div class="value" id="m-diet">—</div></div>
+                    <div class="compliance-item"><div class="label">ΑΣΚΗΣΗ</div><div class="value" id="m-gym">—</div></div>
+                    <div class="compliance-item"><div class="label">8K+</div><div class="value" id="m-steps">—</div></div>
+                    <div class="compliance-item"><div class="label">NO ALC</div><div class="value" id="m-alcohol">—</div></div>
+                </div>
+                <div class="personal-bests">
+                    <div class="pb-item"><div class="label">🏆 Καλύτερη εβδ.</div><div class="value" id="m-bestweek">—</div><div class="date" id="m-bestweek-date"></div></div>
+                    <div class="pb-item"><div class="label">📅 Max streak</div><div class="value" id="m-maxstreak">—</div></div>
+                </div>
+                <div class="badges" id="m-badges"></div>
+            </div>
+        </div>
 
-### Data Sheets
-- **D Sheet**: Δεδομένα για D
-- **M Sheet**: Δεδομένα για M
+        <div class="section-box">
+            <h3>🎯 Milestones</h3>
+            <div class="tabs">
+                <button class="tab active" onclick="showMilestones('d')">D</button>
+                <button class="tab" onclick="showMilestones('m')">M</button>
+            </div>
+            <div class="milestones" id="milestones-d"></div>
+            <div class="milestones hidden" id="milestones-m"></div>
+        </div>
 
-### CSV Format
-```
-ΗΜ/ΝΙΑ,ΗΜΕΡΑ,ΒΑΡΟΣ,ΔΙΑΙΤΑ,ΑΣΚΗΣΗ,8K,ΣΗΜΕΙΩΣΗ
-12/01/26,Δευ,127.4,TRUE,FALSE,TRUE,έναρξη
-```
+        <div class="section-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin: 0;">📈 Trend & Moving Average</h3>
+                <div style="display: flex; gap: 15px; font-size: 0.8em; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 10px; height: 10px; border-radius: 50%; background:#4facfe"></div><span>D</span></div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 10px; height: 10px; border-radius: 50%; background:#f093fb"></div><span>M</span></div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 20px; height: 2px; background:#4facfe; opacity:0.4"></div><span>7d avg</span></div>
+                </div>
+            </div>
+            <canvas id="weightChart"></canvas>
+        </div>
 
-### Αλλαγή Start/Target
-Επεξεργασία `index.html`, γραμμές 268-271:
-```javascript
-let CONFIG = {
-    D: { start: 127.4, target: 110 },
-    M: { start: 65.3, target: 58 }
-};
-```
+        <div class="section-box">
+            <h3>📊 Weekly Summary</h3>
+            <div class="tabs">
+                <button class="tab active" onclick="showWeekly('d')">D</button>
+                <button class="tab" onclick="showWeekly('m')">M</button>
+            </div>
+            <div id="weekly-d"><table class="data-table"><thead><tr><th>Εβδομάδα</th><th>Αρχή</th><th>Τέλος</th><th>Αλλαγή</th></tr></thead><tbody id="weekly-table-d"></tbody></table></div>
+            <div id="weekly-m" class="hidden"><table class="data-table"><thead><tr><th>Εβδομάδα</th><th>Αρχή</th><th>Τέλος</th><th>Αλλαγή</th></tr></thead><tbody id="weekly-table-m"></tbody></table></div>
+        </div>
 
-## Features
-- 📊 Weight tracking με 7-day moving average
-- 🔥 Streak counter
-- 📈 Progress bars & ETA
-- 📅 Consistency heatmap
-- ⚖️ D vs M comparison
-- 🏆 Badges & achievements
-- Auto-refresh κάθε 5 λεπτά
+        <div class="section-box">
+            <h3>📅 Monthly Summary</h3>
+            <div class="tabs">
+                <button class="tab active" onclick="showMonthly('d')">D</button>
+                <button class="tab" onclick="showMonthly('m')">M</button>
+            </div>
+            <div id="monthly-d"><table class="data-table"><thead><tr><th>Μήνας</th><th>Αρχή</th><th>Τέλος</th><th>Αλλαγή</th><th>Μετρήσεις</th></tr></thead><tbody id="monthly-table-d"></tbody></table></div>
+            <div id="monthly-m" class="hidden"><table class="data-table"><thead><tr><th>Μήνας</th><th>Αρχή</th><th>Τέλος</th><th>Αλλαγή</th><th>Μετρήσεις</th></tr></thead><tbody id="monthly-table-m"></tbody></table></div>
+        </div>
+
+        <div class="section-box">
+            <h3>📋 Ιστορικό Μετρήσεων</h3>
+            <div class="tabs">
+                <button class="tab active" onclick="showHistory('d')">D</button>
+                <button class="tab" onclick="showHistory('m')">M</button>
+            </div>
+            <div id="history-d"><table class="data-table"><thead><tr><th>Ημ/νία</th><th>Βάρος</th><th>Αλλαγή</th><th>Από αρχή</th></tr></thead><tbody id="history-table-d"></tbody></table></div>
+            <div id="history-m" class="hidden"><table class="data-table"><thead><tr><th>Ημ/νία</th><th>Βάρος</th><th>Αλλαγή</th><th>Από αρχή</th></tr></thead><tbody id="history-table-m"></tbody></table></div>
+        </div>
+
+        <div class="section-box">
+            <h3>📅 Consistency Heatmap</h3>
+            <div style="display: flex; gap: 15px;">
+                <div style="flex: 1; overflow-x: auto;"><h4 style="font-size: 0.9em; margin-bottom: 10px; color: #4facfe;">D</h4><div style="display: flex; gap: 3px;" id="heatmap-d"></div></div>
+                <div style="flex: 1; overflow-x: auto;"><h4 style="font-size: 0.9em; margin-bottom: 10px; color: #f093fb;">M</h4><div style="display: flex; gap: 3px;" id="heatmap-m"></div></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 0.7em; color: #666;">
+                <span>0/4</span>
+                <div style="width: 14px; height: 14px; border-radius: 3px; background: rgba(255,255,255,0.05);"></div>
+                <div style="width: 14px; height: 14px; border-radius: 3px; background: rgba(74,222,128,0.25);"></div>
+                <div style="width: 14px; height: 14px; border-radius: 3px; background: rgba(74,222,128,0.5);"></div>
+                <div style="width: 14px; height: 14px; border-radius: 3px; background: rgba(74,222,128,0.75);"></div>
+                <div style="width: 14px; height: 14px; border-radius: 3px; background: rgba(74,222,128,1);"></div>
+                <span>4/4</span>
+            </div>
+        </div>
+
+        <div class="section-box" id="comparisonBox">
+            <h3>⚖️ Σύγκριση D vs M</h3>
+            <div id="comparison" style="display: flex; flex-direction: column; gap: 15px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const URLS = {
+            D: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTP6nt9UQ58axQ8HfJrfQsJvC4HfWWFfNT9hwMMpq8sOkoFHhIcW10Cia802-JAig/pub?gid=1271072340&single=true&output=csv',
+            M: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQv_roHZk_3uRLEW7V8heM98gXtuNy6juaveJgqkI-yFPHpr8icFwy8_pkTDeCoSw/pub?gid=1070987484&single=true&output=csv'
+        };
+
+        let CONFIG = {
+            D: { start: 127.4, target: 110 },
+            M: { start: 65.3, target: 58 }
+        };
+
+        const SETTINGS_URL = null;
+        let chart = null;
+        let allData = { D: null, M: null };
+
+        function showMilestones(p) {
+            document.querySelectorAll('.section-box:nth-of-type(2) .tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('milestones-d').classList.toggle('hidden', p !== 'd');
+            document.getElementById('milestones-m').classList.toggle('hidden', p !== 'm');
+        }
+
+        function showWeekly(p) {
+            document.querySelectorAll('.section-box:nth-of-type(4) .tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('weekly-d').classList.toggle('hidden', p !== 'd');
+            document.getElementById('weekly-m').classList.toggle('hidden', p !== 'm');
+        }
+
+        function showMonthly(p) {
+            document.querySelectorAll('.section-box:nth-of-type(5) .tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('monthly-d').classList.toggle('hidden', p !== 'd');
+            document.getElementById('monthly-m').classList.toggle('hidden', p !== 'm');
+        }
+
+        function showHistory(p) {
+            document.querySelectorAll('.section-box:nth-of-type(6) .tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('history-d').classList.toggle('hidden', p !== 'd');
+            document.getElementById('history-m').classList.toggle('hidden', p !== 'm');
+        }
+
+        async function loadAllData() {
+            document.getElementById('lastUpdate').textContent = 'Φόρτωση...';
+            let errors = [];
+
+            for (const p of ['D', 'M']) {
+                try {
+                    const resp = await fetch(URLS[p]);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    const csv = await resp.text();
+                    allData[p] = parseCSV(csv, CONFIG[p]);
+                    updateCard(p.toLowerCase(), allData[p], CONFIG[p]);
+                    updateMilestones(p.toLowerCase(), allData[p], CONFIG[p]);
+                    updateHistory(p.toLowerCase(), allData[p], CONFIG[p]);
+                    updateWeekly(p.toLowerCase(), allData[p]);
+                    updateMonthly(p.toLowerCase(), allData[p]);
+                } catch(e) {
+                    console.error(p + ' error:', e);
+                    errors.push(p + ': ' + e.message);
+                }
+            }
+
+            if (errors.length > 0) {
+                document.getElementById('errorBox').classList.remove('hidden');
+                document.getElementById('errorMsg').textContent = errors.join(' | ');
+            }
+
+            updateChart();
+            updateHeatmaps();
+            updateComparison();
+            document.getElementById('lastUpdate').textContent = 'Τελευταία ενημέρωση: ' + new Date().toLocaleString('el-GR');
+        }
+
+        function parseCSV(csv, cfg) {
+            // Proper CSV parsing that handles quoted fields with commas
+            function parseCSVLine(line) {
+                const result = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                result.push(current.trim());
+                return result;
+            }
+            
+            const rows = csv.split('\n').map(r => parseCSVLine(r));
+            const data = rows.slice(1).filter(r => r[0] && r[0].length > 0);
+
+            const cols = { date: 0, day: 1, weight: 2, diet: 3, gym: 4, steps: 5, alcohol: 6 };
+
+            const weights = [], labels = [], dailyCompliance = [];
+            let startKg = cfg.start;
+
+            // Βρες την τελευταία γραμμή με δεδομένα (lastActiveRow)
+            // Μια γραμμή έχει δεδομένα αν: έχει βάρος Ή έχει TRUE σε κάποιο checkbox
+            let lastActiveRow = -1;
+            for (let i = data.length - 1; i >= 0; i--) {
+                const row = data[i];
+                const weightStr = row[cols.weight]?.replace(',', '.') || '';
+                const hasWeight = parseFloat(weightStr) > 0;
+                const hasDiet = row[cols.diet] === 'TRUE';
+                const hasGym = row[cols.gym] === 'TRUE';
+                const hasSteps = row[cols.steps] === 'TRUE';
+                // ALCOHOL TRUE σημαίνει ήπιε - αυτό επίσης είναι "δεδομένο"
+                const hasAlcohol = row[cols.alcohol] === 'TRUE';
+                if (hasWeight || hasDiet || hasGym || hasSteps || hasAlcohol) {
+                    lastActiveRow = i;
+                    break;
+                }
+            }
+
+            // Το totalDays είναι μέχρι την τελευταία ενεργή γραμμή (συμπεριλαμβανομένων κενών στη μέση)
+            const totalDays = lastActiveRow + 1;
+
+            data.forEach((row, idx) => {
+                // Handle Greek decimal format (comma instead of dot)
+                const weightStr = row[cols.weight]?.replace(',', '.') || '';
+                const w = parseFloat(weightStr);
+                if (w > 0) {
+                    if (weights.length === 0) startKg = w;
+                    labels.push(row[0]);
+                    weights.push(w);
+                }
+                let score = 0;
+                if (row[cols.diet] === 'TRUE') score++;
+                if (row[cols.gym] === 'TRUE') score++;
+                if (row[cols.steps] === 'TRUE') score++;
+                if (row[cols.alcohol] === 'FALSE') score++;  // inverted: FALSE = no alcohol = good
+                dailyCompliance.push(score);
+            });
+
+            // X/total: μετράει TRUE μέχρι totalDays (εκτός ALCOHOL που μετράει FALSE)
+            const calcTotalCompliance = (colIndex, invertLogic = false) => {
+                const relevantData = data.slice(0, totalDays);
+                const targetValue = invertLogic ? 'FALSE' : 'TRUE';
+                const success = relevantData.filter(r => r[colIndex] === targetValue).length;
+                return { count: success, total: totalDays };
+            };
+
+            const calcCompliance = (col, invertLogic = false) => {
+                const relevantData = data.slice(0, totalDays);
+                const filled = relevantData.filter(r => r[col] === 'TRUE' || r[col] === 'FALSE');
+                const targetValue = invertLogic ? 'FALSE' : 'TRUE';
+                const yes = filled.filter(r => r[col] === targetValue).length;
+                return filled.length > 0 ? Math.round(yes / filled.length * 100) : 0;
+            };
+
+            let streak = 0;
+            for (let i = dailyCompliance.length - 1; i >= 0; i--) {
+                if (dailyCompliance[i] >= 3) streak++;
+                else break;
+            }
+
+            let maxStreak = 0, tempStreak = 0;
+            dailyCompliance.forEach(s => {
+                if (s >= 3) { tempStreak++; maxStreak = Math.max(maxStreak, tempStreak); }
+                else tempStreak = 0;
+            });
+
+            let bestWeek = { loss: 0, date: '' };
+            for (let i = 1; i < weights.length; i++) {
+                const loss = weights[i-1] - weights[i];
+                if (loss > bestWeek.loss) bestWeek = { loss, date: labels[i] };
+            }
+
+            const ma = weights.map((_, i) => {
+                const slice = weights.slice(Math.max(0, i - 6), i + 1);
+                return slice.reduce((a,b) => a+b, 0) / slice.length;
+            });
+
+            const last7 = weights.slice(-7);
+            const weekAvg = last7.length > 0 ? last7.reduce((a,b) => a+b, 0) / last7.length : null;
+
+            return {
+                weights, labels, ma, dailyCompliance, startKg, totalDays,
+                current: weights.length > 0 ? weights[weights.length - 1] : null,
+                weekAvg, streak, maxStreak, bestWeek,
+                totalCompliance: {
+                    diet: calcTotalCompliance(cols.diet),
+                    gym: calcTotalCompliance(cols.gym),
+                    steps: calcTotalCompliance(cols.steps),
+                    alcohol: calcTotalCompliance(cols.alcohol, true)  // inverted: FALSE = success (no alcohol)
+                },
+                compliance: {
+                    diet: calcCompliance(cols.diet),
+                    gym: calcCompliance(cols.gym),
+                    steps: calcCompliance(cols.steps),
+                    alcohol: calcCompliance(cols.alcohol, true)  // inverted: FALSE = success (no alcohol)
+                }
+            };
+        }
+
+        function getComplianceColor(count, total) {
+            if (total === 0) return 'red';
+            const pct = count / total * 100;
+            if (pct >= 80) return 'green';
+            if (pct >= 50) return 'yellow';
+            return 'red';
+        }
+
+        function updateCard(p, data, cfg) {
+            if (!data || !data.startKg) return;
+            const start = data.startKg, current = data.current || start, target = cfg.target;
+            const lost = start - current, remaining = current - target;
+            const weeks = Math.max(1, data.weights.length - 1), rate = lost / weeks;
+            const pct = Math.min(100, Math.max(0, lost / (start - target) * 100));
+            const etaWeeks = rate > 0 ? Math.ceil(remaining / rate) : null;
+
+            document.getElementById(`${p}-start`).textContent = start.toFixed(1) + ' kg';
+            document.getElementById(`${p}-current`).textContent = current.toFixed(1) + ' kg';
+            document.getElementById(`${p}-weekavg`).textContent = data.weekAvg ? data.weekAvg.toFixed(1) + ' kg' : '—';
+
+            const lostEl = document.getElementById(`${p}-lost`);
+            lostEl.textContent = (lost >= 0 ? '-' : '+') + Math.abs(lost).toFixed(1) + ' kg';
+            lostEl.className = 'stat-value ' + (lost >= 0 ? 'positive' : 'negative');
+
+            document.getElementById(`${p}-remaining`).textContent = remaining.toFixed(1) + ' kg';
+            document.getElementById(`${p}-rate`).textContent = rate.toFixed(2) + ' kg';
+            document.getElementById(`${p}-pct`).textContent = pct.toFixed(0) + '%';
+            document.getElementById(`${p}-bar`).style.width = Math.max(5, pct) + '%';
+            document.getElementById(`${p}-bar`).textContent = pct.toFixed(0) + '%';
+            document.getElementById(`${p}-eta`).textContent = etaWeeks ? `~${etaWeeks} εβδ.` : '—';
+            document.getElementById(`${p}-streak`).textContent = data.streak;
+
+            const tc = data.totalCompliance;
+            
+            const dietEl = document.getElementById(`${p}-diet`);
+            dietEl.textContent = `${tc.diet.count}/${tc.diet.total}`;
+            dietEl.className = 'value ' + getComplianceColor(tc.diet.count, tc.diet.total);
+
+            const gymEl = document.getElementById(`${p}-gym`);
+            gymEl.textContent = `${tc.gym.count}/${tc.gym.total}`;
+            gymEl.className = 'value ' + getComplianceColor(tc.gym.count, tc.gym.total);
+
+            const stepsEl = document.getElementById(`${p}-steps`);
+            stepsEl.textContent = `${tc.steps.count}/${tc.steps.total}`;
+            stepsEl.className = 'value ' + getComplianceColor(tc.steps.count, tc.steps.total);
+
+            const alcoholEl = document.getElementById(`${p}-alcohol`);
+            alcoholEl.textContent = `${tc.alcohol.count}/${tc.alcohol.total}`;
+            alcoholEl.className = 'value ' + getComplianceColor(tc.alcohol.count, tc.alcohol.total);
+
+            document.getElementById(`${p}-bestweek`).textContent = data.bestWeek.loss > 0 ? '-' + data.bestWeek.loss.toFixed(1) + ' kg' : '—';
+            document.getElementById(`${p}-bestweek-date`).textContent = data.bestWeek.date;
+            document.getElementById(`${p}-maxstreak`).textContent = data.maxStreak + ' ημέρες';
+
+            const badges = [];
+            if (lost >= 1) badges.push({ text: '🎯 First kg', class: 'bronze' });
+            if (lost >= 5) badges.push({ text: '🥇 5kg Club', class: 'gold' });
+            if (lost >= 10) badges.push({ text: '🏆 10kg Club', class: 'gold' });
+            if (data.maxStreak >= 7) badges.push({ text: '🔥 7-day streak', class: 'bronze' });
+            if (data.maxStreak >= 14) badges.push({ text: '⚡ 14-day streak', class: 'special' });
+            if (data.compliance.diet >= 90) badges.push({ text: '💪 Diet Master', class: 'special' });
+            if (data.weights.length >= 7) badges.push({ text: '📅 Week 1', class: 'silver' });
+            if (data.weights.length >= 30) badges.push({ text: '📅 Month 1', class: 'silver' });
+            document.getElementById(`${p}-badges`).innerHTML = badges.map(b => `<span class="badge ${b.class}">${b.text}</span>`).join('');
+        }
+
+        function updateMilestones(p, data, cfg) {
+            if (!data) return;
+            const lost = data.startKg - (data.current || data.startKg);
+            const totalToLose = data.startKg - cfg.target;
+            const halfway = totalToLose / 2;
+            const milestones = [
+                { icon: '🎯', title: 'Πρώτο κιλό', target: 1, achieved: lost >= 1 },
+                { icon: '⭐', title: '5 κιλά', target: 5, achieved: lost >= 5 },
+                { icon: '🏆', title: '10 κιλά', target: 10, achieved: lost >= 10 },
+                { icon: '🎉', title: 'Μισός δρόμος', target: halfway, achieved: lost >= halfway },
+                { icon: '👑', title: 'Στόχος!', target: totalToLose, achieved: lost >= totalToLose }
+            ];
+            document.getElementById(`milestones-${p}`).innerHTML = milestones.map(m => `
+                <div class="milestone ${m.achieved ? 'achieved' : ''}">
+                    <div class="icon">${m.icon}</div>
+                    <div class="title">${m.title} (${m.target.toFixed(1)} kg)</div>
+                    <div class="status">${m.achieved ? '✓ Επιτεύχθηκε!' : `${Math.min(100, lost/m.target*100).toFixed(0)}%`}</div>
+                </div>
+            `).join('');
+        }
+
+        function updateHistory(p, data, cfg) {
+            if (!data || data.weights.length === 0) return;
+            const rows = [];
+            for (let i = data.weights.length - 1; i >= 0 && rows.length < 20; i--) {
+                const w = data.weights[i];
+                const prev = i > 0 ? data.weights[i-1] : w;
+                const change = w - prev;
+                const fromStart = w - data.startKg;
+                rows.push(`<tr>
+                    <td>${data.labels[i]}</td>
+                    <td>${w.toFixed(1)} kg</td>
+                    <td class="${change <= 0 ? 'positive' : 'negative'}">${change === 0 ? '—' : (change > 0 ? '+' : '') + change.toFixed(1)}</td>
+                    <td class="${fromStart <= 0 ? 'positive' : 'negative'}">${fromStart > 0 ? '+' : ''}${fromStart.toFixed(1)}</td>
+                </tr>`);
+            }
+            document.getElementById(`history-table-${p}`).innerHTML = rows.join('');
+        }
+
+        function updateWeekly(p, data) {
+            if (!data || data.weights.length < 2) return;
+            const weeks = {};
+            data.labels.forEach((label, i) => {
+                const parts = label.split('/');
+                const d = new Date(2000 + parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                const weekStart = new Date(d);
+                weekStart.setDate(d.getDate() - d.getDay() + 1);
+                const key = weekStart.toISOString().split('T')[0];
+                if (!weeks[key]) weeks[key] = { weights: [], start: null, end: null, label: label };
+                weeks[key].weights.push(data.weights[i]);
+                if (!weeks[key].start) weeks[key].start = data.weights[i];
+                weeks[key].end = data.weights[i];
+            });
+            const rows = Object.entries(weeks).reverse().slice(0, 12).map(([key, w]) => {
+                const change = w.end - w.start;
+                return `<tr>
+                    <td>${key}</td>
+                    <td>${w.start.toFixed(1)} kg</td>
+                    <td>${w.end.toFixed(1)} kg</td>
+                    <td class="${change <= 0 ? 'positive' : 'negative'}">${change === 0 ? '—' : (change > 0 ? '+' : '') + change.toFixed(1)}</td>
+                </tr>`;
+            });
+            document.getElementById(`weekly-table-${p}`).innerHTML = rows.join('');
+        }
+
+        function updateMonthly(p, data) {
+            if (!data || data.weights.length < 2) return;
+            const months = {};
+            const monthNames = ['Ιαν', 'Φεβ', 'Μαρ', 'Απρ', 'Μαι', 'Ιουν', 'Ιουλ', 'Αυγ', 'Σεπ', 'Οκτ', 'Νοε', 'Δεκ'];
+            data.labels.forEach((label, i) => {
+                const parts = label.split('/');
+                const key = `${monthNames[parseInt(parts[1]) - 1]} '${parts[2]}`;
+                if (!months[key]) months[key] = { weights: [], start: null, end: null, count: 0 };
+                months[key].weights.push(data.weights[i]);
+                if (!months[key].start) months[key].start = data.weights[i];
+                months[key].end = data.weights[i];
+                months[key].count++;
+            });
+            const rows = Object.entries(months).reverse().map(([key, m]) => {
+                const change = m.end - m.start;
+                return `<tr>
+                    <td>${key}</td>
+                    <td>${m.start.toFixed(1)} kg</td>
+                    <td>${m.end.toFixed(1)} kg</td>
+                    <td class="${change <= 0 ? 'positive' : 'negative'}">${change === 0 ? '—' : (change > 0 ? '+' : '') + change.toFixed(1)}</td>
+                    <td>${m.count}</td>
+                </tr>`;
+            });
+            document.getElementById(`monthly-table-${p}`).innerHTML = rows.join('');
+        }
+
+        function updateChart() {
+            const datasets = [];
+            let allLabels = [];
+
+            if (allData.D?.labels?.length > 0) {
+                allLabels = allData.D.labels;
+                datasets.push({
+                    label: 'D', data: allData.D.weights,
+                    borderColor: '#4facfe', backgroundColor: 'rgba(79,172,254,0.1)',
+                    tension: 0.3, fill: false, pointRadius: 4, borderWidth: 2
+                });
+                datasets.push({
+                    label: 'D (7d avg)', data: allData.D.ma,
+                    borderColor: 'rgba(79,172,254,0.4)', borderDash: [5,5],
+                    tension: 0.4, fill: false, pointRadius: 0, borderWidth: 2
+                });
+            }
+
+            if (allData.M?.labels?.length > 0) {
+                if (allData.M.labels.length > allLabels.length) allLabels = allData.M.labels;
+                datasets.push({
+                    label: 'M', data: allData.M.weights,
+                    borderColor: '#f093fb', backgroundColor: 'rgba(240,147,251,0.1)',
+                    tension: 0.3, fill: false, pointRadius: 4, borderWidth: 2
+                });
+                datasets.push({
+                    label: 'M (7d avg)', data: allData.M.ma,
+                    borderColor: 'rgba(240,147,251,0.4)', borderDash: [5,5],
+                    tension: 0.4, fill: false, pointRadius: 0, borderWidth: 2
+                });
+            }
+
+            if (datasets.length === 0) return;
+
+            const allWeights = [...(allData.D?.weights || []), ...(allData.M?.weights || [])];
+            const minW = Math.min(...allWeights, CONFIG.D.target, CONFIG.M.target) - 5;
+            const maxW = Math.max(...allWeights) + 5;
+
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('weightChart').getContext('2d'), {
+                type: 'line',
+                data: { labels: allLabels, datasets },
+                options: {
+                    responsive: true,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        annotation: {
+                            annotations: {
+                                dTarget: {
+                                    type: 'line', yMin: CONFIG.D.target, yMax: CONFIG.D.target,
+                                    borderColor: 'rgba(79,172,254,0.6)', borderWidth: 2, borderDash: [10,5],
+                                    label: { display: true, content: 'D: ' + CONFIG.D.target + 'kg', position: 'start', backgroundColor: 'rgba(79,172,254,0.8)', font: { size: 10 } }
+                                },
+                                mTarget: {
+                                    type: 'line', yMin: CONFIG.M.target, yMax: CONFIG.M.target,
+                                    borderColor: 'rgba(240,147,251,0.6)', borderWidth: 2, borderDash: [10,5],
+                                    label: { display: true, content: 'M: ' + CONFIG.M.target + 'kg', position: 'end', backgroundColor: 'rgba(240,147,251,0.8)', font: { size: 10 } }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { min: minW, max: maxW, ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        }
+
+        function updateHeatmaps() {
+            ['d', 'm'].forEach(p => {
+                const container = document.getElementById(`heatmap-${p}`);
+                container.innerHTML = '';
+                const data = p === 'd' ? allData.D : allData.M;
+                if (!data) return;
+                const compliance = data.dailyCompliance.slice(0, data.totalDays);
+                const weeks = Math.ceil(compliance.length / 7);
+                for (let w = 0; w < weeks; w++) {
+                    const weekDiv = document.createElement('div');
+                    weekDiv.style.cssText = 'display: flex; flex-direction: column; gap: 3px;';
+                    for (let d = 0; d < 7; d++) {
+                        const idx = w * 7 + d;
+                        const dayDiv = document.createElement('div');
+                        dayDiv.style.cssText = 'width: 14px; height: 14px; border-radius: 3px;';
+                        const colors = [
+                            'rgba(255,255,255,0.05)',
+                            'rgba(74,222,128,0.25)',
+                            'rgba(74,222,128,0.5)',
+                            'rgba(74,222,128,0.75)',
+                            'rgba(74,222,128,1)'
+                        ];
+                        dayDiv.style.background = idx < compliance.length ? colors[Math.min(4, compliance[idx])] : 'rgba(255,255,255,0.02)';
+                        weekDiv.appendChild(dayDiv);
+                    }
+                    container.appendChild(weekDiv);
+                }
+            });
+        }
+
+        function updateComparison() {
+            if (!allData.D || !allData.M) {
+                document.getElementById('comparisonBox').style.display = 'none';
+                return;
+            }
+            document.getElementById('comparisonBox').style.display = 'block';
+
+            const dLost = allData.D.startKg - (allData.D.current || allData.D.startKg);
+            const mLost = allData.M.startKg - (allData.M.current || allData.M.startKg);
+            const dPct = Math.min(100, Math.max(0, dLost / (allData.D.startKg - CONFIG.D.target) * 100));
+            const mPct = Math.min(100, Math.max(0, mLost / (allData.M.startKg - CONFIG.M.target) * 100));
+            const maxLost = Math.max(dLost, mLost, 1);
+
+            const rows = [
+                { label: 'Απώλεια', dVal: dLost.toFixed(1) + ' kg', mVal: mLost.toFixed(1) + ' kg', dW: dLost/maxLost*100, mW: mLost/maxLost*100 },
+                { label: 'Πρόοδος', dVal: dPct.toFixed(0) + '%', mVal: mPct.toFixed(0) + '%', dW: dPct, mW: mPct },
+                { label: 'Διατροφή', dVal: allData.D.compliance.diet + '%', mVal: allData.M.compliance.diet + '%', dW: allData.D.compliance.diet, mW: allData.M.compliance.diet },
+                { label: 'Άσκηση', dVal: allData.D.compliance.gym + '%', mVal: allData.M.compliance.gym + '%', dW: allData.D.compliance.gym, mW: allData.M.compliance.gym },
+                { label: '8K+', dVal: allData.D.compliance.steps + '%', mVal: allData.M.compliance.steps + '%', dW: allData.D.compliance.steps, mW: allData.M.compliance.steps },
+                { label: 'NO ALC', dVal: allData.D.compliance.alcohol + '%', mVal: allData.M.compliance.alcohol + '%', dW: allData.D.compliance.alcohol, mW: allData.M.compliance.alcohol },
+            ];
+
+            document.getElementById('comparison').innerHTML = rows.map(r => `
+                <div style="display: grid; grid-template-columns: 80px 1fr 50px 1fr 50px; align-items: center; gap: 10px;">
+                    <div style="color: #888; font-size: 0.85em; text-align: right;">${r.label}</div>
+                    <div style="height: 24px; border-radius: 12px; background: linear-gradient(90deg, #4facfe, #00f2fe); width: ${Math.max(5,r.dW)}%;"></div>
+                    <div style="font-size: 0.85em; font-weight: bold; color: #4facfe; text-align: right;">${r.dVal}</div>
+                    <div style="height: 24px; border-radius: 12px; background: linear-gradient(90deg, #f093fb, #f5576c); width: ${Math.max(5,r.mW)}%;"></div>
+                    <div style="font-size: 0.85em; font-weight: bold; color: #f093fb;">${r.mVal}</div>
+                </div>
+            `).join('');
+        }
+
+        loadAllData();
+        setInterval(loadAllData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
